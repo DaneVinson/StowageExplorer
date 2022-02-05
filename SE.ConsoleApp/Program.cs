@@ -2,14 +2,40 @@
 
 public class Program
 {
+    private const string _23skidooFileName = "23skidoo.txt";
+
     private static async Task Main(string[] args)
     {
         try
         {
             var serviceProvider = NewServiceProvider();
 
-            var factory = serviceProvider.GetRequiredService<StorageManager>();
-            var fileStorage = factory.GetFileStorage(StorageNames.LocalStorage);
+            using var storageManager = serviceProvider.GetRequiredService<StorageManager>();
+
+            var localStorage = storageManager.GetFileStorage(StorageNames.LocalStorage);
+            var tempStorage = storageManager.GetFileStorage(StorageNames.TempStorage);
+            var cloudStorage1 = storageManager.GetFileStorage(StorageNames.Cloud1);
+
+            // Write a file to temp storage
+            await tempStorage.WriteText(_23skidooFileName, "23 skidoo!");
+
+            // Copy the file from temp storage to a new folder in local storage
+            await StorageManager.CopyFileAsync(
+                                    tempStorage,
+                                    _23skidooFileName,
+                                    localStorage,
+                                    $"/newfolder5/{_23skidooFileName}");
+
+            // Delete the file from temp storage
+            await tempStorage.Rm(_23skidooFileName);
+
+            // Copy files from local storage to a new folder in cloud storage
+            await StorageManager.CopyFolderAsync(
+                                    localStorage,
+                                    "/source/",
+                                    true,
+                                    cloudStorage1,
+                                    "/newfolder23/");
         }
         catch (Exception exception)
         {

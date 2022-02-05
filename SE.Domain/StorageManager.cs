@@ -1,6 +1,6 @@
 ﻿namespace SE.Domain;
 
-public class StorageManager
+public class StorageManager : IDisposable
 {
     private readonly Dictionary<StorageNames, IFileStorage> _fileStorages;
 
@@ -16,6 +16,75 @@ public class StorageManager
         }
 
         _fileStorages = GetInitializedFileStores(options);
+    }
+
+    ~StorageManager()
+    {
+        Dispose(false);
+    }
+
+    public static async Task CopyFileAsync(
+        IFileStorage sourceStorage,
+        string sourcePath,
+        IFileStorage targetStorage, 
+        string targetPath, 
+        WriteMode writeMode = WriteMode.Create)
+    {
+        using (var sourceStream = await sourceStorage.OpenRead(sourcePath))
+        using (var targetStream = await targetStorage.OpenWrite(targetPath, writeMode))
+        {
+            await sourceStream.CopyToAsync(targetStream);
+        }
+    }
+
+    public static async Task CopyFolderAsync(
+        IFileStorage sourceStorage,
+        string sourcePath,
+        bool recursive,
+        IFileStorage targetStorage,
+        string targetPrependPath = "",
+        WriteMode writeMode = WriteMode.Create)
+    {
+        var files = await sourceStorage.Ls(sourcePath, recursive);
+        var tasks = new List<Task>();
+        var streams = new List<Stream>();
+        try
+        {
+            foreach (var file in files)
+            {
+                var sourceStream = await sourceStorage.OpenRead(file.Path);
+                var targetStream = await targetStorage.OpenWrite($"/{targetPrependPath}/{file.Path}", WriteMode.Create);
+                streams.AddRange(new[] { sourceStream, targetStream });
+                tasks.Add(sourceStream.CopyToAsync(targetStream));
+            }
+
+            await Task.WhenAll(tasks);
+        }
+        finally
+        {
+            streams.ForEach(s => s.Dispose());
+        }
+    }
+
+    public void Dispose()
+    {
+        Dispose(true);
+        GC.SuppressFinalize(this);
+    }
+
+    private void Dispose(bool disposing)
+    {
+        if (Disposed) { return; }
+
+        if (disposing) 
+        {
+            foreach (var storage in _fileStorages.Values)
+            {
+                storage.Dispose();
+            }
+            _fileStorages.Clear();
+        }
+        Disposed = true;
     }
 
     public IFileStorage GetFileStorage(StorageNames name)
@@ -36,8 +105,8 @@ public class StorageManager
             var storageName = Enum.Parse<StorageNames>(option.Name);
             var fileStorage = option.GetType() switch
             {
-                Type type when type == typeof(AzureStorageOptions) => GetAzureStorage1((AzureStorageOptions)option),
-                Type type when type == typeof(LocalStorageOptions) => GetLocalStorage1((LocalStorageOptions)option),
+                Type type when type == typeof(AzureStorageOptions) => GetAzureStorage((AzureStorageOptions)option),
+                Type type when type == typeof(LocalStorageOptions) => GetLocalStorage((LocalStorageOptions)option),
                 _ => throw new NotSupportedException($"{option.GetType()} is not a supported option type")
             };
             fileStorages.Add(storageName, fileStorage);
@@ -45,14 +114,16 @@ public class StorageManager
         return fileStorages;
 
 
-        IFileStorage GetAzureStorage1(AzureStorageOptions options) =>
+        IFileStorage GetAzureStorage(AzureStorageOptions options) =>
             Files.Of.AzureBlobStorage(
                         options.AccountName,
                         options.Key,
                         options.ContainerName);
 
-        IFileStorage GetLocalStorage1(LocalStorageOptions options) =>
+        IFileStorage GetLocalStorage(LocalStorageOptions options) =>
             Files.Of.LocalDisk(options.Root);
     }
+
+    private bool Disposed { get; set; }
 }
 
