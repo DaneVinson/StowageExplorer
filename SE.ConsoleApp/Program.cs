@@ -11,31 +11,32 @@ public class Program
             var serviceProvider = NewServiceProvider();
 
             using var storageManager = serviceProvider.GetRequiredService<StorageManager>();
-
-            var localStorage = storageManager.GetFileStorage(StorageNames.LocalStorage);
             var tempStorage = storageManager.GetFileStorage(StorageNames.TempStorage);
-            var cloudStorage1 = storageManager.GetFileStorage(StorageNames.Cloud1);
 
             // Write a file to temp storage
             await tempStorage.WriteText(_23skidooFileName, "23 skidoo!");
 
             // Copy the file from temp storage to a new folder in local storage
-            await StorageManager.CopyFileAsync(
-                                    tempStorage,
+            await storageManager.CopyFileAsync(
+                                    StorageNames.TempStorage,
                                     _23skidooFileName,
-                                    localStorage,
+                                    StorageNames.LocalStorage,
                                     $"/newfolder5/{_23skidooFileName}");
 
             // Delete the file from temp storage
             await tempStorage.Rm(_23skidooFileName);
 
             // Copy files from local storage to a new folder in cloud storage
-            await StorageManager.CopyFolderAsync(
-                                    localStorage,
+            await storageManager.CopyFolderAsync(
+                                    StorageNames.LocalStorage,
                                     "/source/",
+                                    StorageNames.Cloud1,
                                     true,
-                                    cloudStorage1,
                                     "/newfolder23/");
+
+            // Delete all files from the new folder on the cloud storage
+            var cloudStorage1 = storageManager.GetFileStorage(StorageNames.Cloud1);
+            await cloudStorage1.Rm("/newfolder23/", true);
         }
         catch (Exception exception)
         {

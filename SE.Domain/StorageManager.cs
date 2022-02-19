@@ -23,47 +23,40 @@ public class StorageManager : IDisposable
         Dispose(false);
     }
 
-    public static async Task CopyFileAsync(
-        IFileStorage sourceStorage,
+    public async Task CopyFileAsync(
+        StorageNames source,
         string sourcePath,
-        IFileStorage targetStorage, 
-        string targetPath, 
-        WriteMode writeMode = WriteMode.Create)
+        StorageNames target,
+        string targetPath,
+        WriteMode writeMode = WriteMode.Create,
+        CancellationToken cancellationToken = default)
     {
-        using (var sourceStream = await sourceStorage.OpenRead(sourcePath))
-        using (var targetStream = await targetStorage.OpenWrite(targetPath, writeMode))
+        using (var sourceStream = await GetFileStorage(source).OpenRead(sourcePath, cancellationToken))
+        using (var targetStream = await GetFileStorage(target).OpenWrite(targetPath, writeMode, cancellationToken))
         {
-            await sourceStream.CopyToAsync(targetStream);
+            await sourceStream.CopyToAsync(targetStream, cancellationToken);
         }
     }
 
-    public static async Task CopyFolderAsync(
-        IFileStorage sourceStorage,
+    public async Task CopyFolderAsync(
+        StorageNames source,
         string sourcePath,
+        StorageNames target,
         bool recursive,
-        IFileStorage targetStorage,
         string targetPrependPath = "",
-        WriteMode writeMode = WriteMode.Create)
+        WriteMode writeMode = WriteMode.Create,
+        CancellationToken cancellationToken = default)
     {
-        var files = await sourceStorage.Ls(sourcePath, recursive);
-        var tasks = new List<Task>();
-        var streams = new List<Stream>();
-        try
-        {
-            foreach (var file in files)
-            {
-                var sourceStream = await sourceStorage.OpenRead(file.Path);
-                var targetStream = await targetStorage.OpenWrite($"/{targetPrependPath}/{file.Path}", WriteMode.Create);
-                streams.AddRange(new[] { sourceStream, targetStream });
-                tasks.Add(sourceStream.CopyToAsync(targetStream));
-            }
+        var sourceStorage = GetFileStorage(source);
+        var files = await sourceStorage.Ls(sourcePath, recursive, cancellationToken);
 
-            await Task.WhenAll(tasks);
-        }
-        finally
-        {
-            streams.ForEach(s => s.Dispose());
-        }
+        await Task.WhenAll(files.Select(f => CopyFileAsync(
+                                                    source,
+                                                    f.Path,
+                                                    target,
+                                                    $"/{targetPrependPath}/{f.Path}",
+                                                    writeMode,
+                                                    cancellationToken)));
     }
 
     public void Dispose()
@@ -126,4 +119,3 @@ public class StorageManager : IDisposable
 
     private bool Disposed { get; set; }
 }
-
