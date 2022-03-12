@@ -1,4 +1,3 @@
 ﻿global using Microsoft.Extensions.Configuration;
 global using Microsoft.Extensions.DependencyInjection;
 global using SE.Domain;
-global using Stowage;
