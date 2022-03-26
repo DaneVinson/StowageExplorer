@@ -9,7 +9,7 @@ public static class Program
         try
         {
             var serviceProvider = NewServiceProvider();
-
+            
             using var storageManager = serviceProvider.GetRequiredService<StorageManager>();
             var tempStorage = storageManager.GetFileStorage(StorageNames.TempStorage);
 
