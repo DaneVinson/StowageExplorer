@@ -1,6 +1,6 @@
 ﻿namespace SE.ConsoleApp;
 
-public class Program
+public static class Program
 {
     private const string _23skidooFileName = "23skidoo.txt";
 

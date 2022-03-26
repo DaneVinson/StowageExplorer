@@ -8,7 +8,7 @@ public class StorageManager : IDisposable
     {
         if (options == null) { throw new ArgumentNullException(nameof(options)); }
 
-        var names = options.Select(o => o.Name);
+        var names = options.Select(o => o.Name).ToArray();
         if (options.Count != names.Distinct().Count() ||
             names.Any(name => !Enum.TryParse(name, out StorageNames _))) 
         { 
@@ -31,11 +31,9 @@ public class StorageManager : IDisposable
         WriteMode writeMode = WriteMode.Create,
         CancellationToken cancellationToken = default)
     {
-        using (var sourceStream = await GetFileStorage(source).OpenRead(sourcePath, cancellationToken))
-        using (var targetStream = await GetFileStorage(target).OpenWrite(targetPath, writeMode, cancellationToken))
-        {
-            await sourceStream.CopyToAsync(targetStream, cancellationToken);
-        }
+        await using var sourceStream = await GetFileStorage(source).OpenRead(sourcePath, cancellationToken);
+        await using var targetStream = await GetFileStorage(target).OpenWrite(targetPath, writeMode, cancellationToken);
+        await sourceStream.CopyToAsync(targetStream, cancellationToken);
     }
 
     public async Task CopyFolderAsync(
@@ -98,8 +96,8 @@ public class StorageManager : IDisposable
             var storageName = Enum.Parse<StorageNames>(option.Name);
             var fileStorage = option.GetType() switch
             {
-                Type type when type == typeof(AzureStorageOptions) => GetAzureStorage((AzureStorageOptions)option),
-                Type type when type == typeof(LocalStorageOptions) => GetLocalStorage((LocalStorageOptions)option),
+                { } type when type == typeof(AzureStorageOptions) => GetAzureStorage((AzureStorageOptions)option),
+                { } type when type == typeof(LocalStorageOptions) => GetLocalStorage((LocalStorageOptions)option),
                 _ => throw new NotSupportedException($"{option.GetType()} is not a supported option type")
             };
             fileStorages.Add(storageName, fileStorage);
@@ -107,14 +105,14 @@ public class StorageManager : IDisposable
         return fileStorages;
 
 
-        IFileStorage GetAzureStorage(AzureStorageOptions options) =>
+        IFileStorage GetAzureStorage(AzureStorageOptions storageOptions) =>
             Files.Of.AzureBlobStorage(
-                        options.AccountName,
-                        options.Key,
-                        options.ContainerName);
+                        storageOptions.AccountName,
+                        storageOptions.Key,
+                        storageOptions.ContainerName);
 
-        IFileStorage GetLocalStorage(LocalStorageOptions options) =>
-            Files.Of.LocalDisk(options.Root);
+        IFileStorage GetLocalStorage(LocalStorageOptions storageOptions) =>
+            Files.Of.LocalDisk(storageOptions.Root);
     }
 
     private bool Disposed { get; set; }
