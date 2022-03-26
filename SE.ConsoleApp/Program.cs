@@ -62,8 +62,8 @@ public static class Program
         return new ServiceCollection()
                     .AddSingleton(_ => {
                         var options = new List<IStorageOptions>();
-                        options.AddRange(configuration.GetSection(nameof(AzureStorageOptions)).Get<IEnumerable<AzureStorageOptions>>());
-                        options.AddRange(configuration.GetSection(nameof(LocalStorageOptions)).Get<IEnumerable<LocalStorageOptions>>());
+                        options.AddRange(configuration.GetSection(nameof(AzureStorageOptions)).Get<AzureStorageOptions[]>());
+                        options.AddRange(configuration.GetSection(nameof(LocalStorageOptions)).Get<LocalStorageOptions[]>());
                         return options;
                     })
                     .AddSingleton<StorageManager>()

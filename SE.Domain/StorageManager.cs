@@ -9,7 +9,7 @@ public class StorageManager : IDisposable
         if (options == null) { throw new ArgumentNullException(nameof(options)); }
 
         var names = options.Select(o => o.Name).ToArray();
-        if (options.Count != names.Distinct().Count() ||
+        if (names.Length != names.Distinct().Count() ||
             names.Any(name => !Enum.TryParse(name, out StorageNames _))) 
         { 
             throw new ArgumentException($"Option names must be unique and defined by {nameof(StorageNames)}"); 
