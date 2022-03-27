@@ -1,4 +1,6 @@
-﻿namespace SE.Domain;
+﻿using System.Text;
+
+namespace SE.Domain;
 
 public class StorageManager : IDisposable
 {
@@ -78,16 +80,15 @@ public class StorageManager : IDisposable
         Disposed = true;
     }
 
-    public IFileStorage GetFileStorage(StorageNames name)
+    public FileStorageFacade GetFileStorage(StorageNames name)
     {
-        if (!_fileStorages.ContainsKey(name)) 
-        { 
-            throw new InvalidOperationException($"No file storage is registered for storage name {name}"); 
+        if (!_fileStorages.TryGetValue(name, out var storage))
+        {
+            throw new ArgumentException($"Storage {name} is not defined");
         }
-
-        return _fileStorages[name];
+        return new FileStorageFacade(storage);
     }
-
+    
     private Dictionary<StorageNames, IFileStorage> GetInitializedFileStores(List<IStorageOptions> options)
     {
         var fileStorages = new Dictionary<StorageNames, IFileStorage>();
@@ -116,4 +117,48 @@ public class StorageManager : IDisposable
     }
 
     private bool Disposed { get; set; }
+    
+    /// <summary>
+    /// Simple facade over a <see cref="IFileStorage"/> object to remove the ability of users to call
+    /// Dispose on the underlying object as <see cref="StorageManager"/> is responsible for disposing. 
+    /// </summary>
+    public class FileStorageFacade
+    {
+        private readonly IFileStorage _fileStorage;
+        
+        public FileStorageFacade(IFileStorage fileStorage)
+        {
+            _fileStorage = fileStorage ?? throw new ArgumentNullException(nameof(fileStorage));
+        }
+        
+        public Task<bool> Exists(IOPath path, CancellationToken cancellationToken = new CancellationToken()) =>
+            _fileStorage.Exists(path, cancellationToken);
+
+        public Task<IReadOnlyCollection<IOEntry>> Ls(IOPath? path = null, bool recurse = false, CancellationToken cancellationToken = new CancellationToken()) =>
+            _fileStorage.Ls(path, recurse, cancellationToken);
+
+        public Task<Stream> OpenRead(IOPath path, CancellationToken cancellationToken = new CancellationToken()) =>
+            _fileStorage.OpenRead(path, cancellationToken);
+
+        public Task<Stream> OpenWrite(IOPath path, WriteMode mode, CancellationToken cancellationToken = new CancellationToken()) =>
+            _fileStorage.OpenWrite(path, mode, cancellationToken);
+
+        public Task<T> ReadAsJson<T>(IOPath path, CancellationToken cancellationToken = new CancellationToken()) =>
+            _fileStorage.ReadAsJson<T>(path, cancellationToken);
+
+        public Task<string> ReadText(IOPath path, Encoding? encoding = null, CancellationToken cancellationToken = new CancellationToken()) =>
+            _fileStorage.ReadText(path, encoding, cancellationToken);
+    
+        public Task Ren(IOPath name, IOPath newName, CancellationToken cancellationToken = new CancellationToken()) =>
+            _fileStorage.Ren(name, newName, cancellationToken);
+
+        public Task Rm(IOPath path, bool recurse = false, CancellationToken cancellationToken = new CancellationToken()) =>
+            _fileStorage.Rm(path, recurse, cancellationToken);
+
+        public Task WriteAsJson(IOPath path, object value, CancellationToken cancellationToken = new CancellationToken()) =>
+            _fileStorage.WriteAsJson(path, value, cancellationToken);
+
+        public Task WriteText(IOPath path, string contents, Encoding? encoding = null, CancellationToken cancellationToken = new CancellationToken()) =>
+            _fileStorage.WriteText(path, contents, encoding, cancellationToken);
+    }
 }
